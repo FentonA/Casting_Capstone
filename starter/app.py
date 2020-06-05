@@ -1,7 +1,10 @@
 import os
-from flask import Flask, request, abort, jsonify
+from flask import Flask, request, abort, jsonify, flash, redirect, url_for
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
+from models import Movies, Actors, setup_db, db
+import json 
+from auth import AuthError, requires_auth, get_token_auth_header
 
 def create_app(test_config=None):
   # create and configure the app
@@ -9,7 +12,7 @@ def create_app(test_config=None):
   CORS(app)
   setup_db(app)
 
-  cors = CORS(app, resources={r"/api/":{"origins": "*"})
+  cors = CORS(app, resources={r"/api/":{"origins": "*"}})
 
   '''CORS request set up
   '''
@@ -19,13 +22,14 @@ def create_app(test_config=None):
     response.headers.add('Acccess-Control-Allow-Headers', 'GET, POST, DELETE, PATCH, OPTIONS')
     response.headers.add('Access-Control-Allow-Origin', '*')
 
-  @app.route('/homepage', methods=["GET"]):
+  @app.route('/homepage', methods=["GET"])
   def homepage():
     return render_template("index.html")
 
   @app.route('/actors')
+  @requires_auth('get:actors')
   def actors():
-    actors = Actor.query.all()
+    actors = Actors.query.all()
     formatted_actor = [actor.format() for actor in actors]
     return jsonify({
       'success':True,
@@ -34,6 +38,7 @@ def create_app(test_config=None):
     })
 
   @app.route('/movies')
+  @requires_auth('get:movies')
   def movies():
     movies = Movies.query.all()
     formatted_movie = [movies.format() for movie in movies]
@@ -44,8 +49,9 @@ def create_app(test_config=None):
     })
 
   @app.route('/actor/<int:actor_id>', mehtods =['DELETE'])
+  @requires_auth('delete:actors')
   def del_actor(actor_id):
-    del_actor = Actor.query.get(actor_id)
+    del_actor = Actors.query.get(actor_id)
     if not del_actor:
       abort(404)
     try:
@@ -61,8 +67,9 @@ def create_app(test_config=None):
 
 
     @app.route('/movies/<int:movie_id>', methods = ["DELETE"])
+    @requires_auth('delete:movies')
     def del_movies(movie_id):
-      del_movie = Movie.query.get(movie_id)
+      del_movie = Movies.query.get(movie_id)
       if not del_movie:
         abort(404)
       try:
@@ -77,10 +84,12 @@ def create_app(test_config=None):
       })
 
     @app.route('/actors', methods =["POST"])
+    @requires_auth('post:actors')
     def add_actors():
       body = request.get_json()
       name = body.get('name', None)
       age = body.get('age', None)
+      gender = body.get('gender', None)
 
       actors = Actors(
         name = name, 
@@ -89,28 +98,29 @@ def create_app(test_config=None):
       )
 
       actors.insert()
-      formmated_actor = [actor.format() for ator in actors]
+      formatted_actor = [actor.format() for actor in actors]
       return jsonify({
         'success': True,
-        'actors': formmatted_actor,
+        'actors': formatted_actor,
         'total_actors': len(formatted_actor)
       })
 
     @app.route('/movies', methods = ['POST'])
+    @requires_auth('post:movies')
     def add_movies():
       body = request.get_json()
       title = request.get_json()
       runtime = request.get_json()
       release = request.get_json()
 
-      movies = Movie(
+      movies = Movies(
         title = title,
         runtime = runtime,
         relase = release
       )
 
       movies.insert()
-      formatted_movie = [actor.format() for movie in movies]
+      formatted_movie = [movie.format() for movie in movies]
 
       return jsonify({
         'success': True,
@@ -120,17 +130,18 @@ def create_app(test_config=None):
 
 
     @app.route('/actors<int:actors_id>', methods =["PATCH"])
+    @requires_auth('patch:actors')
     def update_actors(actors_id):
-      selected_actor = Actor.query.filter(Actor.id == actors_id).one_or_none()
+      selected_actor = Actors.query.filter(Actors.id == actors_id).one_or_none()
       if selected_actor is None:
         abort(404)
       body = request.get_json()
-      selected_actor.name = body.get('name'. selected_actor.name)
-      selcted_actor.age = body.get('age', selected_actor.age)
+      selected_actor.name = body.get('name', selected_actor.name)
+      selected_actor.age = body.get('age', selected_actor.age)
       selected_actor.gender = body.get('gender', selected_actor.gender)
       selected_actor.update()
 
-      actors = Actor.query.all()
+      actors = Actors.query.all()
       formatted_actor = [selected_actor.format() for actor in actors]
 
       return jsonify({
@@ -140,17 +151,18 @@ def create_app(test_config=None):
       })
 
     @app.route('/movies<int:movies_id>', methods =["PATCH"])
+    @requires_auth('patch:movies')
     def update_movie(movies_id):
-      selected_movie = Movie.query.filter(Movie.id == movies_id).one_or_none()
+      selected_movie = Movies.query.filter(Movies.id == movies_id).one_or_none()
       if selected_movie is None:
         abort(404)
       body = request.get_json()
-      selected_movie.name = body.get('name'. selected_movie.name)
-      selcted_movie.age = body.get('age', selected_movie.age)
+      selected_movie.name = body.get('name', selected_movie.name)
+      selected_movie.age = body.get('age', selected_movie.age)
       selected_movie.gender = body.get('gender', selected_movie.gender)
       selected_movie.update()
 
-      movies = Movie.query.all()
+      movies = Movies.query.all()
       formatted_movie = [selected_movie.format() for movie in movie]
 
       return jsonify({
@@ -164,12 +176,12 @@ def create_app(test_config=None):
     #====================================================
 
     @app.errorhandler(422)
-	  def unproccessable(error):
-		return jsonify({
-            "success": False,
-            "error": 422,
-            "message": "Unprocessable"
-        }), 422
+    def unproccessable(error):
+      return jsonify({
+              "success": False,
+              "error": 422,
+              "message": "Unprocessable"
+          }), 422
 
 
     '''

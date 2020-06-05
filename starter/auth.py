@@ -7,14 +7,14 @@ from urlib.requests import urlopen
 
 AUTH0_DOMAIN = 'dev-hsnuo.auth0.com'
 ALGORITHMS = ['RS256']
-API_AUDIENNCE = #Capstone
+API_AUDIENCE = 'casting'
 
 ##AuthError Exception
 
 class AuthError(Exception):
-    def __init__(self, error, status_code)
-    self.error = error 
-    self.status_code = status_code
+    def __init__(self, error, status_code):
+        self.error = error 
+        self.status_code = status_code
 
 ##Auth Header 
 def get_token_auth_header():
@@ -42,18 +42,18 @@ def get_token_auth_header():
     }, 401)
 
     def check_permissions(permission, payload):
-    if 'permissions' not in payload:
-        raise AuthError({
-            'code': 'invalid claims',
-            'description':'Permssion not inlcuded in this payload'
-    }, 400)
-    if permission not in payload['permissions']:
-        raise AuthError({
-            'code': 'unauthorized',
-            'description': "You don't have permission to access this"
-    }, 401)
-    
-    return True
+        if 'permissions' not in payload:
+            raise AuthError({
+                'code': 'invalid claims',
+                'description':'Permssion not inlcuded in this payload'
+        }, 400)
+        if permission not in payload['permissions']:
+            raise AuthError({
+                'code': 'unauthorized',
+                'description': "You don't have permission to access this"
+        }, 401)
+        
+        return True
 
 def verify_decode_jwt(token):
     jsonurl = urlopen(f'https://{AUTH0_DOMAIN}/.well-known/jwks.json')
